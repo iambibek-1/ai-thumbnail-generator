@@ -123,17 +123,26 @@ export const generateThumbnail = async (req: Request, res: Response) => {
     });
     //check response is valid
     if (!response?.candidates?.[0]?.content?.parts) {
+      console.error("Full AI response:", JSON.stringify(response, null, 2));
       throw new Error("Invalid response ");
     }
     const parts = response.candidates[0].content.parts;
+    console.log("Response parts:", JSON.stringify(parts, null, 2));
 
     let finalBuffer: Buffer | null = null;
 
     for (const part of parts) {
-      if (part.inlineDate) {
-        finalBuffer = Buffer.from(part.inlineData, "base64");
+      if (part.inlineData) {
+        finalBuffer = Buffer.from(part.inlineData.data, "base64");
+        break;
       }
     }
+
+    if (!finalBuffer) {
+      console.error("No inlineData found in parts:", JSON.stringify(parts, null, 2));
+      throw new Error("AI did not return image data. Parts received: " + JSON.stringify(parts));
+    }
+
     const fileName = `final-output-${Date.now()}.png`;
     const filePath = path.join("images", fileName);
 
@@ -141,7 +150,7 @@ export const generateThumbnail = async (req: Request, res: Response) => {
     fs.mkdirSync("images", { recursive: true });
 
     //write the image buffer to a file
-    fs.writeFileSync(filePath, finalBuffer!);
+    fs.writeFileSync(filePath, finalBuffer);
 
     const uploadResult = await cloudinary.uploader.upload(filePath, {
       resource_type: "image",
